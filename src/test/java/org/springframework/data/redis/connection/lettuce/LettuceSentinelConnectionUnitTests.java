@@ -18,6 +18,7 @@ package org.springframework.data.redis.connection.lettuce;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -32,8 +33,8 @@ import org.springframework.data.redis.connection.RedisServer;
 
 import com.lambdaworks.redis.RedisClient;
 import com.lambdaworks.redis.RedisFuture;
-import com.lambdaworks.redis.codec.RedisCodec;
 import com.lambdaworks.redis.sentinel.api.StatefulRedisSentinelConnection;
+import com.lambdaworks.redis.sentinel.api.sync.RedisSentinelCommands;
 
 /**
  * @author Christoph Strobl
@@ -47,6 +48,7 @@ public class LettuceSentinelConnectionUnitTests {
 	private @Mock RedisClient redisClientMock;
 
 	private @Mock StatefulRedisSentinelConnection<String, String> connectionMock;
+	private @Mock RedisSentinelCommands<String, String> sentinelCommandsMock;
 
 	private @Mock RedisFuture<List<Map<String, String>>> redisFutureMock;
 
@@ -55,7 +57,8 @@ public class LettuceSentinelConnectionUnitTests {
 	@Before
 	public void setUp() {
 
-		when(redisClientMock.connectSentinel(any(RedisCodec.class))).thenReturn(connectionMock);
+		when(redisClientMock.connectSentinel()).thenReturn(connectionMock);
+		when(connectionMock.sync()).thenReturn(sentinelCommandsMock);
 		this.connection = new LettuceSentinelConnection(redisClientMock);
 	}
 
@@ -64,7 +67,7 @@ public class LettuceSentinelConnectionUnitTests {
 	 */
 	@Test
 	public void shouldConnectAfterCreation() {
-		verify(redisClientMock, times(1)).connectSentinelAsync();
+		verify(redisClientMock, times(1)).connectSentinel();
 	}
 
 	/**
@@ -74,7 +77,7 @@ public class LettuceSentinelConnectionUnitTests {
 	public void failoverShouldBeSentCorrectly() {
 
 		connection.failover(new RedisNodeBuilder().withName(MASTER_ID).build());
-		verify(connectionMock, times(1)).async().failover(eq(MASTER_ID));
+		verify(sentinelCommandsMock, times(1)).failover(eq(MASTER_ID));
 	}
 
 	/**
@@ -99,9 +102,9 @@ public class LettuceSentinelConnectionUnitTests {
 	@Test
 	public void mastersShouldReadMastersCorrectly() {
 
-		when(connectionMock.async().masters()).thenReturn(redisFutureMock);
+		when(sentinelCommandsMock.masters()).thenReturn(Collections.emptyList());
 		connection.masters();
-		verify(connectionMock, times(1)).async().masters();
+		verify(sentinelCommandsMock, times(1)).masters();
 	}
 
 	/**
@@ -110,9 +113,9 @@ public class LettuceSentinelConnectionUnitTests {
 	@Test
 	public void shouldReadSlavesCorrectly() {
 
-		when(connectionMock.async().slaves(MASTER_ID)).thenReturn(redisFutureMock);
+		when(sentinelCommandsMock.slaves(MASTER_ID)).thenReturn(Collections.emptyList());
 		connection.slaves(MASTER_ID);
-		verify(connectionMock, times(1)).async().slaves(eq(MASTER_ID));
+		verify(sentinelCommandsMock, times(1)).slaves(eq(MASTER_ID));
 	}
 
 	/**
@@ -121,9 +124,9 @@ public class LettuceSentinelConnectionUnitTests {
 	@Test
 	public void shouldReadSlavesCorrectlyWhenGivenNamedNode() {
 
-		when(connectionMock.async().slaves(MASTER_ID)).thenReturn(redisFutureMock);
+		when(sentinelCommandsMock.slaves(MASTER_ID)).thenReturn(Collections.emptyList());
 		connection.slaves(new RedisNodeBuilder().withName(MASTER_ID).build());
-		verify(connectionMock, times(1)).async().slaves(eq(MASTER_ID));
+		verify(sentinelCommandsMock, times(1)).slaves(eq(MASTER_ID));
 	}
 
 	/**
@@ -157,7 +160,7 @@ public class LettuceSentinelConnectionUnitTests {
 	public void shouldRemoveMasterCorrectlyWhenGivenNamedNode() {
 
 		connection.remove(new RedisNodeBuilder().withName(MASTER_ID).build());
-		verify(connectionMock, times(1)).async().remove(eq(MASTER_ID));
+		verify(sentinelCommandsMock, times(1)).remove(eq(MASTER_ID));
 	}
 
 	/**
@@ -195,7 +198,7 @@ public class LettuceSentinelConnectionUnitTests {
 		server.setQuorum(3L);
 
 		connection.monitor(server);
-		verify(connectionMock, times(1)).async().monitor(eq("anothermaster"), eq("127.0.0.1"), eq(6382), eq(3));
+		verify(sentinelCommandsMock, times(1)).monitor(eq("anothermaster"), eq("127.0.0.1"), eq(6382), eq(3));
 	}
 
 }

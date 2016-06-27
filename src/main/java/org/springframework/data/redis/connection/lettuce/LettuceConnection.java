@@ -82,7 +82,6 @@ import com.lambdaworks.redis.MapScanCursor;
 import com.lambdaworks.redis.RedisClient;
 import com.lambdaworks.redis.RedisException;
 import com.lambdaworks.redis.RedisFuture;
-import com.lambdaworks.redis.RedisSentinelAsyncConnection;
 import com.lambdaworks.redis.RedisURI;
 import com.lambdaworks.redis.ScanArgs;
 import com.lambdaworks.redis.ScoredValue;
@@ -117,6 +116,7 @@ import com.lambdaworks.redis.protocol.Command;
 import com.lambdaworks.redis.protocol.CommandArgs;
 import com.lambdaworks.redis.protocol.CommandType;
 import com.lambdaworks.redis.pubsub.StatefulRedisPubSubConnection;
+import com.lambdaworks.redis.sentinel.api.StatefulRedisSentinelConnection;
 
 /**
  * {@code RedisConnection} implementation on top of <a href="https://github.com/mp911de/lettuce">Lettuce</a> Redis
@@ -4051,8 +4051,8 @@ public class LettuceConnection extends AbstractRedisConnection {
 	 */
 	@Override
 	protected RedisSentinelConnection getSentinelConnection(RedisNode sentinel) {
-		RedisSentinelAsyncConnection<String, String> connection = ((RedisClient) client)
-				.connectSentinelAsync(getRedisURI(sentinel));
+		StatefulRedisSentinelConnection<String, String> connection = ((RedisClient) client)
+				.connectSentinel(getRedisURI(sentinel));
 		return new LettuceSentinelConnection(connection);
 	}
 

@@ -624,6 +624,6 @@ public class LettuceConnectionFactory implements InitializingBean, DisposableBea
 		if (!(client instanceof RedisClient)) {
 			throw new InvalidDataAccessResourceUsageException("Unable to connect to sentinels using " + client.getClass());
 		}
-		return new LettuceSentinelConnection(((RedisClient) client).connectSentinelAsync());
+		return new LettuceSentinelConnection(((RedisClient) client).connectSentinel());
 	}
 }
