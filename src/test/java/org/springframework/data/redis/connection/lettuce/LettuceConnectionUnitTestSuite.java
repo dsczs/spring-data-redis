@@ -30,8 +30,8 @@ import org.springframework.data.redis.connection.RedisServerCommands.ShutdownOpt
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionUnitTestSuite.LettuceConnectionUnitTests;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionUnitTestSuite.LettucePipelineConnectionUnitTests;
 
-import com.lambdaworks.redis.RedisAsyncConnectionImpl;
 import com.lambdaworks.redis.RedisClient;
+import com.lambdaworks.redis.api.StatefulRedisConnection;
 import com.lambdaworks.redis.codec.RedisCodec;
 
 /**
@@ -43,7 +43,8 @@ import com.lambdaworks.redis.codec.RedisCodec;
 public class LettuceConnectionUnitTestSuite {
 
 	@SuppressWarnings("rawtypes")
-	public static class LettuceConnectionUnitTests extends AbstractConnectionUnitTestBase<RedisAsyncConnectionImpl> {
+	public static class LettuceConnectionUnitTests
+			extends AbstractConnectionUnitTestBase<StatefulRedisConnection<byte[], byte[]>> {
 
 		protected LettuceConnection connection;
 		private RedisClient clientMock;
@@ -53,7 +54,7 @@ public class LettuceConnectionUnitTestSuite {
 		public void setUp() throws InvocationTargetException, IllegalAccessException {
 
 			clientMock = mock(RedisClient.class);
-			when(clientMock.connectAsync((RedisCodec) any())).thenReturn(getNativeRedisConnectionMock());
+			when(clientMock.connect((RedisCodec) any())).thenReturn(getNativeRedisConnectionMock());
 			connection = new LettuceConnection(0, clientMock);
 		}
 
