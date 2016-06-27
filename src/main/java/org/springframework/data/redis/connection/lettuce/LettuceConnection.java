@@ -157,13 +157,13 @@ public class LettuceConnection extends AbstractRedisConnection {
 	private boolean convertPipelineAndTxResults = true;
 
 	@SuppressWarnings("rawtypes")
-	private class LettuceResult extends FutureResult<Command<?, ?, ?>> {
+	private class LettuceResult extends FutureResult<com.lambdaworks.redis.protocol.RedisCommand<?, ?, ?>> {
 		public <T> LettuceResult(Future<T> resultHolder, Converter<T, ?> converter) {
-			super((Command) resultHolder, converter);
+			super((com.lambdaworks.redis.protocol.RedisCommand) resultHolder, converter);
 		}
 
 		public LettuceResult(Future resultHolder) {
-			super((Command) resultHolder);
+			super((com.lambdaworks.redis.protocol.RedisCommand) resultHolder);
 		}
 
 		@SuppressWarnings("unchecked")
@@ -171,9 +171,9 @@ public class LettuceConnection extends AbstractRedisConnection {
 		public Object get() {
 			try {
 				if (convertPipelineAndTxResults && converter != null) {
-					return converter.convert(resultHolder.get());
+					return converter.convert(resultHolder.getOutput().get());
 				}
-				return resultHolder.get();
+				return resultHolder.getOutput().get();
 			} catch (Exception e) {
 				throw EXCEPTION_TRANSLATION.translate(e);
 			}
@@ -459,7 +459,7 @@ public class LettuceConnection extends AbstractRedisConnection {
 	public List<Object> closePipeline() {
 		if (isPipelined) {
 			isPipelined = false;
-			List<Command<?, ?, ?>> futures = new ArrayList<Command<?, ?, ?>>();
+			List<com.lambdaworks.redis.protocol.RedisCommand<?, ?, ?>> futures = new ArrayList<com.lambdaworks.redis.protocol.RedisCommand<?, ?, ?>>();
 			for (LettuceResult result : ppline) {
 				futures.add(result.getResultHolder());
 			}
@@ -467,44 +467,48 @@ public class LettuceConnection extends AbstractRedisConnection {
 			// boolean done = LettuceFutures.awaitAll(timeout, TimeUnit.MILLISECONDS,
 			// futures.toArray(new Command[futures.size()]));
 
-			boolean done = LettuceFutures.awaitAll(timeout, TimeUnit.MILLISECONDS,
-					futures.toArray(new RedisFuture[futures.size()]));
+			try {
+				boolean done = LettuceFutures.awaitAll(timeout, TimeUnit.MILLISECONDS,
+						futures.toArray(new RedisFuture[futures.size()]));
 
-			List<Object> results = new ArrayList<Object>(futures.size());
+				List<Object> results = new ArrayList<Object>(futures.size());
 
-			Exception problem = null;
+				Exception problem = null;
 
-			if (done) {
-				for (LettuceResult result : ppline) {
-					if (result.getResultHolder().getOutput().hasError()) {
-						Exception err = new InvalidDataAccessApiUsageException(result.getResultHolder().getOutput().getError());
-						// remember only the first error
-						if (problem == null) {
-							problem = err;
-						}
-						results.add(err);
-					} else if (!convertPipelineAndTxResults || !(result.isStatus())) {
-						try {
-							results.add(result.get());
-						} catch (DataAccessException e) {
+				if (done) {
+					for (LettuceResult result : ppline) {
+						if (result.getResultHolder().getOutput().hasError()) {
+							Exception err = new InvalidDataAccessApiUsageException(result.getResultHolder().getOutput().getError());
+							// remember only the first error
 							if (problem == null) {
-								problem = e;
+								problem = err;
 							}
-							results.add(e);
+							results.add(err);
+						} else if (!convertPipelineAndTxResults || !(result.isStatus())) {
+							try {
+								results.add(result.get());
+							} catch (DataAccessException e) {
+								if (problem == null) {
+									problem = e;
+								}
+								results.add(e);
+							}
 						}
 					}
 				}
-			}
-			ppline.clear();
+				ppline.clear();
 
-			if (problem != null) {
-				throw new RedisPipelineException(problem, results);
-			}
-			if (done) {
-				return results;
-			}
+				if (problem != null) {
+					throw new RedisPipelineException(problem, results);
+				}
+				if (done) {
+					return results;
+				}
 
-			throw new RedisPipelineException(new QueryTimeoutException("Redis command timed out"));
+				throw new RedisPipelineException(new QueryTimeoutException("Redis command timed out"));
+			} catch (Exception e) {
+				throw new RedisPipelineException(e);
+			}
 		}
 
 		return Collections.emptyList();
