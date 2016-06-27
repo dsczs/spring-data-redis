@@ -90,11 +90,14 @@ import com.lambdaworks.redis.ScoredValueScanCursor;
 import com.lambdaworks.redis.SortArgs;
 import com.lambdaworks.redis.ValueScanCursor;
 import com.lambdaworks.redis.ZStoreArgs;
+import com.lambdaworks.redis.api.StatefulConnection;
 import com.lambdaworks.redis.api.StatefulRedisConnection;
-import com.lambdaworks.redis.api.async.RedisAsyncCommands;
 import com.lambdaworks.redis.api.async.RedisHLLAsyncCommands;
 import com.lambdaworks.redis.api.sync.RedisCommands;
 import com.lambdaworks.redis.api.sync.RedisHLLCommands;
+import com.lambdaworks.redis.cluster.api.StatefulRedisClusterConnection;
+import com.lambdaworks.redis.cluster.api.async.RedisClusterAsyncCommands;
+import com.lambdaworks.redis.cluster.api.sync.RedisClusterCommands;
 import com.lambdaworks.redis.codec.RedisCodec;
 import com.lambdaworks.redis.output.BooleanOutput;
 import com.lambdaworks.redis.output.ByteArrayOutput;
@@ -138,8 +141,8 @@ public class LettuceConnection extends AbstractRedisConnection {
 	private final int defaultDbIndex;
 	private int dbIndex;
 
-	private final StatefulRedisConnection<byte[], byte[]> asyncSharedConn;
-	private StatefulRedisConnection<byte[], byte[]> asyncDedicatedConn;
+	private final StatefulConnection<byte[], byte[]> asyncSharedConn;
+	private StatefulConnection<byte[], byte[]> asyncDedicatedConn;
 
 	private final long timeout;
 
@@ -372,7 +375,7 @@ public class LettuceConnection extends AbstractRedisConnection {
 				cmdArg.addKeys(args);
 			}
 
-			RedisAsyncCommands<byte[], byte[]> connectionImpl = getAsyncConnection();
+			RedisClusterAsyncCommands<byte[], byte[]> connectionImpl = getAsyncConnection();
 
 			CommandOutput expectedOutput = commandOutputTypeHint != null ? commandOutputTypeHint
 					: typeHints.getTypeHint(commandType);
@@ -437,7 +440,7 @@ public class LettuceConnection extends AbstractRedisConnection {
 		return isClosed && !isSubscribed();
 	}
 
-	public RedisAsyncCommands<byte[], byte[]> getNativeConnection() {
+	public RedisClusterAsyncCommands<byte[], byte[]> getNativeConnection() {
 		return (subscription != null ? subscription.pubsub.async() : getAsyncConnection());
 	}
 
@@ -1124,10 +1127,10 @@ public class LettuceConnection extends AbstractRedisConnection {
 
 			this.dbIndex = dbIndex;
 			if (isQueueing()) {
-				transaction(new LettuceTxStatusResult(getConnection().select(dbIndex)));
+				transaction(new LettuceTxStatusResult(((RedisCommands) getConnection()).select(dbIndex)));
 				return;
 			}
-			getConnection().select(dbIndex);
+			((RedisCommands) getConnection()).select(dbIndex);
 		} catch (Exception ex) {
 			throw convertLettuceAccessException(ex);
 		}
@@ -3822,41 +3825,60 @@ public class LettuceConnection extends AbstractRedisConnection {
 		txResults.add(result);
 	}
 
-	private RedisAsyncCommands<byte[], byte[]> getAsyncConnection() {
+	private RedisClusterAsyncCommands<byte[], byte[]> getAsyncConnection() {
 		if (isQueueing()) {
 			return getAsyncDedicatedConnection();
 		}
 		if (asyncSharedConn != null) {
-			return asyncSharedConn.async();
+
+			if (asyncSharedConn instanceof StatefulRedisConnection) {
+				return ((StatefulRedisConnection<byte[], byte[]>) asyncSharedConn).async();
+			}
 		}
 		return getAsyncDedicatedConnection();
 	}
 
-	protected RedisCommands<byte[], byte[]> getConnection() {
+	protected RedisClusterCommands<byte[], byte[]> getConnection() {
 
 		if (isQueueing()) {
 			return getDedicatedConnection();
 		}
 		if (asyncSharedConn != null) {
-			return asyncSharedConn.sync();
+
+			if (asyncSharedConn instanceof StatefulRedisConnection) {
+				return ((StatefulRedisConnection<byte[], byte[]>) asyncSharedConn).sync();
+			}
+			if (asyncSharedConn instanceof StatefulRedisClusterConnection) {
+				return ((StatefulRedisClusterConnection<byte[], byte[]>) asyncSharedConn).sync();
+			}
 		}
 		return getDedicatedConnection();
 	}
 
-	protected RedisAsyncCommands<byte[], byte[]> getAsyncDedicatedConnection() {
+	protected RedisClusterAsyncCommands<byte[], byte[]> getAsyncDedicatedConnection() {
 		if (asyncDedicatedConn == null) {
 
 			asyncDedicatedConn = doGetAsyncDedicatedConnection();
 
 			if (this.pool == null) {
-				this.asyncDedicatedConn.sync().select(dbIndex);
+
+				if (asyncDedicatedConn instanceof StatefulRedisConnection) {
+					((StatefulRedisConnection<byte[], byte[]>) asyncDedicatedConn).sync().select(0);
+				}
 			}
 
 		}
-		return asyncDedicatedConn.async();
+
+		if (asyncDedicatedConn instanceof StatefulRedisConnection) {
+			return ((StatefulRedisConnection<byte[], byte[]>) asyncDedicatedConn).async();
+		}
+		if (asyncDedicatedConn instanceof StatefulRedisClusterConnection) {
+			return ((StatefulRedisClusterConnection<byte[], byte[]>) asyncDedicatedConn).async();
+		}
+		throw new RuntimeException("o_O doh - what a mess!");
 	}
 
-	protected StatefulRedisConnection<byte[], byte[]> doGetAsyncDedicatedConnection() {
+	protected StatefulConnection<byte[], byte[]> doGetAsyncDedicatedConnection() {
 
 		if (this.pool != null) {
 			return (StatefulRedisConnection<byte[], byte[]>) pool.getResource();
@@ -3865,18 +3887,29 @@ public class LettuceConnection extends AbstractRedisConnection {
 		}
 	}
 
-	private RedisCommands<byte[], byte[]> getDedicatedConnection() {
+	private RedisClusterCommands<byte[], byte[]> getDedicatedConnection() {
 
 		if (asyncDedicatedConn == null) {
 
 			asyncDedicatedConn = doGetAsyncDedicatedConnection();
 
 			if (this.pool == null) {
-				this.asyncDedicatedConn.sync().select(dbIndex);
+
+				if (asyncDedicatedConn instanceof StatefulRedisConnection) {
+					((StatefulRedisConnection<byte[], byte[]>) asyncDedicatedConn).sync().select(0);
+				}
 			}
 
 		}
-		return asyncDedicatedConn.sync();
+
+		if (asyncDedicatedConn instanceof StatefulRedisConnection) {
+			return ((StatefulRedisConnection<byte[], byte[]>) asyncDedicatedConn).sync();
+		}
+		if (asyncDedicatedConn instanceof StatefulRedisClusterConnection) {
+			return ((StatefulRedisClusterConnection<byte[], byte[]>) asyncDedicatedConn).sync();
+		}
+
+		throw new RuntimeException("o_O wtf not a statefulredisconnection");
 	}
 
 	private Future<Long> asyncBitOp(BitOperation op, byte[] destination, byte[]... keys) {
