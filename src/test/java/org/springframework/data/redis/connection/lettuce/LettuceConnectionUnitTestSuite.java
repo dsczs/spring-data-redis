@@ -76,7 +76,7 @@ public class LettuceConnectionUnitTestSuite {
 		public void shutdownWithNullOpionsIsCalledCorrectly() {
 
 			connection.shutdown(null);
-			verifyNativeConnectionInvocation().shutdown(true);
+			verify(syncCommandsMock, times(1)).shutdown(true);
 		}
 
 		/**
@@ -86,7 +86,7 @@ public class LettuceConnectionUnitTestSuite {
 		public void shutdownWithNosaveOptionIsCalledCorrectly() {
 
 			connection.shutdown(ShutdownOption.NOSAVE);
-			verifyNativeConnectionInvocation().shutdown(false);
+			verify(syncCommandsMock, times(1)).shutdown(false);
 		}
 
 		/**
@@ -96,7 +96,7 @@ public class LettuceConnectionUnitTestSuite {
 		public void shutdownWithSaveOptionIsCalledCorrectly() {
 
 			connection.shutdown(ShutdownOption.SAVE);
-			verifyNativeConnectionInvocation().shutdown(true);
+			verify(syncCommandsMock, times(1)).shutdown(true);
 		}
 
 		/**
@@ -107,7 +107,7 @@ public class LettuceConnectionUnitTestSuite {
 
 			String ipPort = "127.0.0.1:1001";
 			connection.killClient("127.0.0.1", 1001);
-			verifyNativeConnectionInvocation().clientKill(eq(ipPort));
+			verify(syncCommandsMock, times(1)).clientKill(eq(ipPort));
 		}
 
 		/**
@@ -117,7 +117,7 @@ public class LettuceConnectionUnitTestSuite {
 		public void getClientNameShouldSendRequestCorrectly() {
 
 			connection.getClientName();
-			verifyNativeConnectionInvocation().clientGetname();
+			verify(syncCommandsMock, times(1)).clientGetname();
 		}
 
 		/**
@@ -135,7 +135,7 @@ public class LettuceConnectionUnitTestSuite {
 		public void slaveOfShouldBeSentCorrectly() {
 
 			connection.slaveOf("127.0.0.1", 1001);
-			verifyNativeConnectionInvocation().slaveof(eq("127.0.0.1"), eq(1001));
+			verify(syncCommandsMock, times(1)).slaveof(eq("127.0.0.1"), eq(1001));
 		}
 
 		/**
@@ -145,7 +145,7 @@ public class LettuceConnectionUnitTestSuite {
 		public void slaveOfNoOneShouldBeSentCorrectly() {
 
 			connection.slaveOfNoOne();
-			verifyNativeConnectionInvocation().slaveofNoOne();
+			verify(syncCommandsMock, times(1)).slaveofNoOne();
 		}
 
 		/**

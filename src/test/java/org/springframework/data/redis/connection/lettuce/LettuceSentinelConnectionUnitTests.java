@@ -32,7 +32,8 @@ import org.springframework.data.redis.connection.RedisServer;
 
 import com.lambdaworks.redis.RedisClient;
 import com.lambdaworks.redis.RedisFuture;
-import com.lambdaworks.redis.RedisSentinelAsyncConnection;
+import com.lambdaworks.redis.codec.RedisCodec;
+import com.lambdaworks.redis.sentinel.api.StatefulRedisSentinelConnection;
 
 /**
  * @author Christoph Strobl
@@ -45,7 +46,7 @@ public class LettuceSentinelConnectionUnitTests {
 
 	private @Mock RedisClient redisClientMock;
 
-	private @Mock RedisSentinelAsyncConnection<String, String> connectionMock;
+	private @Mock StatefulRedisSentinelConnection<String, String> connectionMock;
 
 	private @Mock RedisFuture<List<Map<String, String>>> redisFutureMock;
 
@@ -54,7 +55,7 @@ public class LettuceSentinelConnectionUnitTests {
 	@Before
 	public void setUp() {
 
-		when(redisClientMock.connectSentinelAsync()).thenReturn(connectionMock);
+		when(redisClientMock.connectSentinel(any(RedisCodec.class))).thenReturn(connectionMock);
 		this.connection = new LettuceSentinelConnection(redisClientMock);
 	}
 
@@ -73,7 +74,7 @@ public class LettuceSentinelConnectionUnitTests {
 	public void failoverShouldBeSentCorrectly() {
 
 		connection.failover(new RedisNodeBuilder().withName(MASTER_ID).build());
-		verify(connectionMock, times(1)).failover(eq(MASTER_ID));
+		verify(connectionMock, times(1)).async().failover(eq(MASTER_ID));
 	}
 
 	/**
@@ -98,9 +99,9 @@ public class LettuceSentinelConnectionUnitTests {
 	@Test
 	public void mastersShouldReadMastersCorrectly() {
 
-		when(connectionMock.masters()).thenReturn(redisFutureMock);
+		when(connectionMock.async().masters()).thenReturn(redisFutureMock);
 		connection.masters();
-		verify(connectionMock, times(1)).masters();
+		verify(connectionMock, times(1)).async().masters();
 	}
 
 	/**
@@ -109,9 +110,9 @@ public class LettuceSentinelConnectionUnitTests {
 	@Test
 	public void shouldReadSlavesCorrectly() {
 
-		when(connectionMock.slaves(MASTER_ID)).thenReturn(redisFutureMock);
+		when(connectionMock.async().slaves(MASTER_ID)).thenReturn(redisFutureMock);
 		connection.slaves(MASTER_ID);
-		verify(connectionMock, times(1)).slaves(eq(MASTER_ID));
+		verify(connectionMock, times(1)).async().slaves(eq(MASTER_ID));
 	}
 
 	/**
@@ -120,9 +121,9 @@ public class LettuceSentinelConnectionUnitTests {
 	@Test
 	public void shouldReadSlavesCorrectlyWhenGivenNamedNode() {
 
-		when(connectionMock.slaves(MASTER_ID)).thenReturn(redisFutureMock);
+		when(connectionMock.async().slaves(MASTER_ID)).thenReturn(redisFutureMock);
 		connection.slaves(new RedisNodeBuilder().withName(MASTER_ID).build());
-		verify(connectionMock, times(1)).slaves(eq(MASTER_ID));
+		verify(connectionMock, times(1)).async().slaves(eq(MASTER_ID));
 	}
 
 	/**
@@ -156,7 +157,7 @@ public class LettuceSentinelConnectionUnitTests {
 	public void shouldRemoveMasterCorrectlyWhenGivenNamedNode() {
 
 		connection.remove(new RedisNodeBuilder().withName(MASTER_ID).build());
-		verify(connectionMock, times(1)).remove(eq(MASTER_ID));
+		verify(connectionMock, times(1)).async().remove(eq(MASTER_ID));
 	}
 
 	/**
@@ -194,7 +195,7 @@ public class LettuceSentinelConnectionUnitTests {
 		server.setQuorum(3L);
 
 		connection.monitor(server);
-		verify(connectionMock, times(1)).monitor(eq("anothermaster"), eq("127.0.0.1"), eq(6382), eq(3));
+		verify(connectionMock, times(1)).async().monitor(eq("anothermaster"), eq("127.0.0.1"), eq(6382), eq(3));
 	}
 
 }
