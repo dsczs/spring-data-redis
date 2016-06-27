@@ -32,6 +32,8 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionUnitTe
 
 import com.lambdaworks.redis.RedisClient;
 import com.lambdaworks.redis.api.StatefulRedisConnection;
+import com.lambdaworks.redis.api.async.RedisAsyncCommands;
+import com.lambdaworks.redis.api.sync.RedisCommands;
 import com.lambdaworks.redis.codec.RedisCodec;
 
 /**
@@ -43,18 +45,27 @@ import com.lambdaworks.redis.codec.RedisCodec;
 public class LettuceConnectionUnitTestSuite {
 
 	@SuppressWarnings("rawtypes")
-	public static class LettuceConnectionUnitTests
-			extends AbstractConnectionUnitTestBase<StatefulRedisConnection<byte[], byte[]>> {
+	public static class LettuceConnectionUnitTests extends AbstractConnectionUnitTestBase<RedisAsyncCommands> {
 
 		protected LettuceConnection connection;
 		private RedisClient clientMock;
+		protected StatefulRedisConnection<byte[], byte[]> statefulConnectionMock;
+		protected RedisAsyncCommands<byte[], byte[]> asyncCommandsMock;
+		protected RedisCommands syncCommandsMock;
 
 		@SuppressWarnings({ "unchecked" })
 		@Before
 		public void setUp() throws InvocationTargetException, IllegalAccessException {
 
 			clientMock = mock(RedisClient.class);
-			when(clientMock.connect((RedisCodec) any())).thenReturn(getNativeRedisConnectionMock());
+			statefulConnectionMock = mock(StatefulRedisConnection.class);
+			when(clientMock.connect((RedisCodec) any())).thenReturn(statefulConnectionMock);
+
+			asyncCommandsMock = getNativeRedisConnectionMock();
+			syncCommandsMock = mock(RedisCommands.class);
+
+			when(statefulConnectionMock.async()).thenReturn(getNativeRedisConnectionMock());
+			when(statefulConnectionMock.sync()).thenReturn(syncCommandsMock);
 			connection = new LettuceConnection(0, clientMock);
 		}
 
@@ -154,7 +165,7 @@ public class LettuceConnectionUnitTestSuite {
 			connection = new LettuceConnection(null, 0, clientMock, null, 1);
 			connection.getNativeConnection();
 
-			verify(getNativeRedisConnectionMock(), times(1)).select(1);
+			verify(syncCommandsMock, times(1)).select(1);
 		}
 	}
 
